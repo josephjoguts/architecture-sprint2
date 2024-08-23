@@ -1,35 +1,30 @@
-# pymongo-api
+План запуска приложения:
 
-## Как запустить
+1. `docker volume rm -f $(docker volume ls -q)`
+    1. Опционально. Команда очищает текущие volume на случай коллизии в названиях
 
-Запускаем mongodb и приложение
+2. `docker compose up -d`
+    1. Запуск приложения, дождаться раскатки
 
-```shell
-docker compose up -d
-```
+3. `docker-compose exec configSrv-1 sh -c "mongosh < /scripts/init-configserver.js"`
+    1. Раскатываем конфиг сервер
 
-Заполняем mongodb данными
+4. `docker-compose exec shard1-a sh -c "mongosh < /scripts/init-shard01.js"`
+5. `docker-compose exec shard2-a sh -c "mongosh < /scripts/init-shard02.js"`
+    1. Раскатываем шарды. При ошибке коннекта необходимо повторить, они иногда не сразу инициилизируются
 
-```shell
-./scripts/mongo-init.sh
-```
+6. `docker-compose exec mongos_router sh -c "mongosh < /scripts/init-router.js"`
+    1. Раскатываем роутер. Необходимо подождать секунд 30 перед запуском команды, пока нормально инициилизируются шарды и конфиг сервер
 
-## Как проверить
+7. `docker-compose exec mongos_router mongosh`
+   `use somedb`  
+   `for(var i = 0; i < 3000; i++) db.helloDoc.insert({age:i, name:"ly"+i})`
+   Заполняем данные в коллекции
 
-### Если вы запускаете проект на локальной машине
+После этих 7 пунктов приложение заработает и можно зайти в swagger
+http://localhost:8080/docs#/default/list_users__collection_name__users_get
+И проверять
 
-Откройте в браузере http://localhost:8080
 
-### Если вы запускаете проект на предоставленной виртуальной машине
-
-Узнать белый ip виртуальной машины
-
-```shell
-curl --silent http://ifconfig.me
-```
-
-Откройте в браузере http://<ip виртуальной машины>:8080
-
-## Доступные эндпоинты
-
-Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
+Ссылка на схему:
+https://drive.google.com/file/d/1ygmjrtspasgylVs3Fd7tM6RXTbymZnYQ/view?usp=sharing

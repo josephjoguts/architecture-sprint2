@@ -1,0 +1,17 @@
+docker volume rm -f $(docker volume ls -q)
+
+
+docker compose up -d
+docker-compose exec shard1-a sh -c "mongosh < /scripts/init-shard01.js"
+docker-compose exec shard2-a sh -c "mongosh < /scripts/init-shard02.js"
+docker-compose exec configSrv-1 sh -c "mongosh < /scripts/init-configserver.js"
+docker-compose exec mongos_router sh -c "mongosh < /scripts/init-router.js"
+
+
+docker-compose exec mongos_router mongosh
+use somedb
+for(var i = 0; i < 3000; i++) db.helloDoc.insert({age:i, name:"ly"+i})
+db.helloDoc.countDocuments()
+
+
+docker-compose exec shard2-b mongosh

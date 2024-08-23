@@ -1,0 +1,121 @@
+name: mongo-sharding
+
+services:
+  configSrv-1:
+    image: mongo:6.0.1 # docker образ
+    container_name: configSrv-1
+    command: mongod --port 27017 --configsvr --replSet config_server
+    restart: always
+    volumes:
+      - ./scripts:/scripts
+      - config-data-1:/data/db
+    ports:
+      - "27007:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.7
+
+
+  configSrv-2:
+    image: mongo:6.0.1 # docker образ
+    container_name: configSrv-2
+    command: mongod --port 27017 --configsvr --replSet config_server
+    restart: always
+    ports:
+      - "27002:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.2
+    volumes:
+      - config-data-2:/data/db
+
+  configSrv-3:
+    image: mongo:6.0.1 # docker образ
+    container_name: configSrv-3
+    command: mongod --port 27017 --configsvr --replSet config_server
+    restart: always
+    ports:
+      - "27003:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.3
+    volumes:
+      - config-data-3:/data/db
+
+  shard1:
+    image: mongo:6.0.1
+    container_name: shard1
+    restart: always
+    ports:
+      - "27008:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.8
+    volumes:
+      - ./scripts:/scripts
+      - shard1-data:/data/db
+    command: mongod --port 27017 --shardsvr --replSet shard1 --bind_ip_all
+
+  shard2:
+    image: mongo:6.0.1
+    container_name: shard2
+    restart: always
+    ports:
+      - "27005:27017"
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.5
+    volumes:
+      - ./scripts:/scripts
+      - shard2-data:/data/db
+    command: mongod --port 27017 --shardsvr --replSet shard2 --bind_ip_all
+
+  mongos_router:
+    image: mongo:6.0.1
+    container_name: mongos_router
+    command: mongos --port 27017 --configdb config_server/configSrv-1:27017,configSrv-2:27017 --bind_ip_all
+    restart: always
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.6
+    ports:
+      - "27006:27017"
+    volumes:
+      - ./scripts:/scripts
+      - mongodb_cluster_router01_db:/data/db
+      - mongodb_cluster_router01_config:/data/configdb
+
+  pymongo_api:
+    container_name: pymongo_api
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    networks:
+      app-network:
+        ipv4_address: 173.17.0.12
+    depends_on:
+      - mongos_router
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://mongos_router"
+      MONGODB_DATABASE_NAME: "somedb"
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 173.17.0.0/16
+
+volumes:
+  config-data-1:
+  config-data-2:
+  config-data-3:
+  shard1-data:
+  shard2-data:
+  mongodb_cluster_router01_db:
+  mongodb_cluster_router01_config:
+
